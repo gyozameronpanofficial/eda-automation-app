@@ -268,4 +268,59 @@ except Exception as e:
 
 # フッター
 st.markdown("---")
+st.markdown("*分布分析が完了しました。次は「相関分析」ページをご確認ください。*")'], 2),
+                        '修正Z-score法外れ値数': outliers['modified_zscore']['count'],
+                        '修正Z-score法外れ値率(%)': round(outliers['modified_zscore']['percentage'], 2)
+                    }
+                    outlier_summary.append(summary)
+            
+            if outlier_summary:
+                outlier_summary_df = pd.DataFrame(outlier_summary)
+                st.dataframe(outlier_summary_df, use_container_width=True)
+    
+    # カテゴリ列サマリー
+    if categorical_cols:
+        st.subheader("📝 カテゴリ列サマリー")
+        
+        categorical_summary = []
+        max_categories = config['visualization'].get('max_categories', 20)
+        
+        for col in categorical_cols:
+            unique_count = df[col].nunique()
+            missing_count = df[col].isnull().sum()
+            missing_rate = missing_count / len(df) * 100
+            
+            if unique_count > 0:
+                most_frequent = df[col].mode().iloc[0] if len(df[col].dropna()) > 0 else "N/A"
+                most_frequent_count = df[col].value_counts().iloc[0] if len(df[col].dropna()) > 0 else 0
+                most_frequent_rate = most_frequent_count / len(df[col].dropna()) * 100 if len(df[col].dropna()) > 0 else 0
+            else:
+                most_frequent = "N/A"
+                most_frequent_count = 0
+                most_frequent_rate = 0
+            
+            summary = {
+                'カラム名': col,
+                'ユニーク値数': unique_count,
+                '欠損数': missing_count,
+                '欠損率(%)': round(missing_rate, 2),
+                '最頻値': most_frequent,
+                '最頻値出現数': most_frequent_count,
+                '最頻値出現率(%)': round(most_frequent_rate, 2)
+            }
+            categorical_summary.append(summary)
+        
+        if categorical_summary:
+            categorical_summary_df = pd.DataFrame(categorical_summary)
+            st.dataframe(categorical_summary_df, use_container_width=True)
+
+# 分析結果の保存
+try:
+    distribution_results = viz.create_distribution_plots(df)
+    SessionStateManager.save_analysis_result('distribution', distribution_results)
+except Exception as e:
+    st.error(f"分析結果の保存に失敗しました: {str(e)}")
+
+# フッター
+st.markdown("---")
 st.markdown("*分布分析が完了しました。次は「相関分析」ページをご確認ください。*")

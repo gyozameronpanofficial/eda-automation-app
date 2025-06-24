@@ -16,9 +16,38 @@ class Visualization:
         self.config = config
         self.viz_config = config.get('visualization', {})
         
-        # matplotlib設定
+        # matplotlib日本語フォント設定
         plt.style.use('default')
         sns.set_style(self.viz_config.get('style', 'whitegrid'))
+        
+        # 日本語フォントの設定を強制
+        import matplotlib.font_manager as fm
+        
+        # システムで利用可能な日本語フォントを探す
+        font_candidates = [
+            'Hiragino Sans',           # macOS
+            'Hiragino Kaku Gothic Pro', # macOS
+            'Yu Gothic',               # Windows
+            'Meiryo',                  # Windows
+            'Takao Gothic',            # Linux
+            'IPAexGothic',             # Linux
+            'Noto Sans CJK JP',        # Universal
+            'DejaVu Sans'              # Fallback
+        ]
+        
+        available_font = None
+        for font_name in font_candidates:
+            if any(font_name in f.name for f in fm.fontManager.ttflist):
+                available_font = font_name
+                break
+        
+        if available_font:
+            plt.rcParams['font.family'] = available_font
+        
+        # その他の設定
+        plt.rcParams['font.size'] = 12
+        plt.rcParams['axes.unicode_minus'] = False  # マイナス記号の文字化け防止
+        
         plt.rcParams['figure.figsize'] = (
             self.viz_config.get('figure_size', {}).get('width', 10),
             self.viz_config.get('figure_size', {}).get('height', 6)
@@ -181,28 +210,28 @@ class Visualization:
         
         # ヒストグラム
         axes[0, 0].hist(data, bins=30, alpha=0.7, color='skyblue', edgecolor='black')
-        axes[0, 0].axvline(data.mean(), color='red', linestyle='--', label=f'平均: {data.mean():.3f}')
-        axes[0, 0].axvline(data.median(), color='green', linestyle='--', label=f'中央値: {data.median():.3f}')
-        axes[0, 0].set_title(f'{column} - ヒストグラム')
+        axes[0, 0].axvline(data.mean(), color='red', linestyle='--', label=f'Mean: {data.mean():.3f}')
+        axes[0, 0].axvline(data.median(), color='green', linestyle='--', label=f'Median: {data.median():.3f}')
+        axes[0, 0].set_title(f'{column} - Histogram')
         axes[0, 0].set_xlabel(column)
-        axes[0, 0].set_ylabel('頻度')
+        axes[0, 0].set_ylabel('Frequency')
         axes[0, 0].legend()
         
         # 箱ひげ図
         box_plot = axes[0, 1].boxplot(data, patch_artist=True)
         box_plot['boxes'][0].set_facecolor('lightblue')
-        axes[0, 1].set_title(f'{column} - 箱ひげ図')
+        axes[0, 1].set_title(f'{column} - Box Plot')
         axes[0, 1].set_ylabel(column)
         
         # Q-Qプロット
         stats.probplot(data, dist="norm", plot=axes[1, 0])
-        axes[1, 0].set_title(f'{column} - Q-Qプロット（正規分布）')
+        axes[1, 0].set_title(f'{column} - Q-Q Plot (Normal Distribution)')
         
         # 密度プロット
         data.plot.density(ax=axes[1, 1], color='purple', alpha=0.7)
-        axes[1, 1].set_title(f'{column} - 確率密度')
+        axes[1, 1].set_title(f'{column} - Density Plot')
         axes[1, 1].set_xlabel(column)
-        axes[1, 1].set_ylabel('密度')
+        axes[1, 1].set_ylabel('Density')
         
         plt.tight_layout()
         st.pyplot(fig)

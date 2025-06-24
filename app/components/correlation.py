@@ -17,9 +17,37 @@ class Correlation:
         self.correlation_config = config.get('correlation', {})
         self.viz_config = config.get('visualization', {})
         
-        # matplotlib設定
+        # matplotlib日本語フォント設定
         plt.style.use('default')
         sns.set_style(self.viz_config.get('style', 'whitegrid'))
+        
+        # 日本語フォントの設定を強制
+        import matplotlib.font_manager as fm
+        
+        # システムで利用可能な日本語フォントを探す
+        font_candidates = [
+            'Hiragino Sans',           # macOS
+            'Hiragino Kaku Gothic Pro', # macOS
+            'Yu Gothic',               # Windows
+            'Meiryo',                  # Windows
+            'Takao Gothic',            # Linux
+            'IPAexGothic',             # Linux
+            'Noto Sans CJK JP',        # Universal
+            'DejaVu Sans'              # Fallback
+        ]
+        
+        available_font = None
+        for font_name in font_candidates:
+            if any(font_name in f.name for f in fm.fontManager.ttflist):
+                available_font = font_name
+                break
+        
+        if available_font:
+            plt.rcParams['font.family'] = available_font
+        
+        # その他の設定
+        plt.rcParams['font.size'] = 12
+        plt.rcParams['axes.unicode_minus'] = False  # マイナス記号の文字化け防止
     
     def calculate_correlation_matrix(self, df: pd.DataFrame, method: str = None) -> Dict[str, Any]:
         """
@@ -124,12 +152,9 @@ class Correlation:
         """相関ヒートマップを作成"""
         fig, ax = plt.subplots(figsize=(12, 10))
         
-        # ヒートマップ作成
-        mask = np.triu(np.ones_like(correlation_matrix, dtype=bool))
-        
+        # ヒートマップ作成（マスクなしで全体表示）
         sns.heatmap(
             correlation_matrix,
-            mask=mask,
             annot=True,
             cmap='RdBu_r',
             center=0,
@@ -137,26 +162,38 @@ class Correlation:
             linewidths=0.5,
             cbar_kws={"shrink": 0.8},
             ax=ax,
-            fmt='.3f'
+            fmt='.3f',
+            vmin=-1,
+            vmax=1
         )
         
-        ax.set_title(f'相関ヒートマップ ({method})', fontsize=16, pad=20)
+        ax.set_title(f'Correlation Heatmap ({method})', fontsize=16, pad=20)
+        
+        # 軸ラベルの回転
+        plt.xticks(rotation=45, ha='right')
+        plt.yticks(rotation=0)
         plt.tight_layout()
         
         return fig
     
     def create_interactive_heatmap(self, correlation_matrix: pd.DataFrame, method: str) -> go.Figure:
         """インタラクティブ相関ヒートマップを作成"""
-        # 上三角マスク
-        mask = np.triu(np.ones_like(correlation_matrix))
-        masked_corr = correlation_matrix.mask(mask.astype(bool))
-        
+        # 全体のヒートマップを表示（マスクなし）
         fig = px.imshow(
-            masked_corr,
+            correlation_matrix,
             color_continuous_scale='RdBu_r',
             aspect='auto',
-            title=f'相関ヒートマップ ({method})',
-            labels={'color': '相関係数'}
+            title=f'Correlation Heatmap ({method})',
+            labels={'color': 'Correlation Coefficient'},
+            zmin=-1,
+            zmax=1
+        )
+        
+        # 相関係数の値をテキストで表示
+        fig.update_traces(
+            text=correlation_matrix.round(3).values,
+            texttemplate="%{text}",
+            textfont={"size": 10}
         )
         
         fig.update_layout(
@@ -319,9 +356,9 @@ class Correlation:
         
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.hist(corr_values, bins=15, alpha=0.7, color='lightcoral', edgecolor='black')
-        ax.set_xlabel('相関係数の絶対値')
-        ax.set_ylabel('頻度')
-        ax.set_title('強い相関の分布')
+        ax.set_xlabel('Correlation Coefficient (Absolute Value)')
+        ax.set_ylabel('Frequency')
+        ax.set_title('Distribution of Strong Correlations')
         ax.grid(True, alpha=0.3)
         
         st.pyplot(fig)

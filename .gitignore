@@ -41,6 +41,10 @@ Desktop.ini
 .DS_Store
 .AppleDouble
 .LSOverride
+._*
+
+# Linux
+*~
 
 # 機密情報
 .env
@@ -49,3 +53,7 @@ secrets/
 # 実行時生成ファイル
 *.pid
 *.lock
+
+# シェルスクリプト実行ファイル（権限保持のため除外しない）
+# setup.sh
+# run.sh

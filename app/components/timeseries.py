@@ -52,15 +52,28 @@ class TimeSeries:
         
         # object型の列で日付らしいものを検出
         for col in df.select_dtypes(include=['object']).columns:
-            sample_data = df[col].dropna().head(100)
-            if len(sample_data) > 0:
+            # カラム名で判定
+            if any(keyword in col.lower() for keyword in ['date', 'time', 'timestamp', '日付', '時刻']):
+                datetime_cols.append(col)
+                continue
+                
+            # データ内容で判定
+            valid_data = df[col].dropna()
+            valid_data = valid_data[valid_data != '']
+            valid_data = valid_data[valid_data != 'None']
+            valid_data = valid_data[valid_data != 'null']
+            
+            if len(valid_data) > 0:
+                sample_size = min(50, len(valid_data))
+                sample_data = valid_data.iloc[:sample_size]
+                
                 try:
                     # pandas.to_datetimeで変換を試行
                     converted = pd.to_datetime(sample_data, errors='coerce')
                     success_rate = converted.notna().sum() / len(sample_data)
                     
-                    # 80%以上変換できたら日付列と判定
-                    if success_rate >= 0.8:
+                    # 60%以上変換できたら日付列と判定（さらに閾値を下げる）
+                    if success_rate >= 0.6:
                         datetime_cols.append(col)
                 except:
                     continue
@@ -182,11 +195,44 @@ class TimeSeries:
         last_date = pd.to_datetime(df_pred[date_col]).max()
         freq = self._estimate_frequency(df_pred[date_col])
         
-        future_dates = pd.date_range(
-            start=last_date + freq,
-            periods=future_periods,
-            freq=freq
-        )
+        # 頻度に応じた日付生成
+        if freq == 'D':
+            future_dates = pd.date_range(
+                start=last_date + pd.Timedelta(days=1),
+                periods=future_periods,
+                freq='D'
+            )
+        elif freq == 'W':
+            future_dates = pd.date_range(
+                start=last_date + pd.Timedelta(weeks=1),
+                periods=future_periods,
+                freq='W'
+            )
+        elif freq == 'M':
+            future_dates = pd.date_range(
+                start=last_date + pd.DateOffset(months=1),
+                periods=future_periods,
+                freq='M'
+            )
+        elif freq == 'Q':
+            future_dates = pd.date_range(
+                start=last_date + pd.DateOffset(months=3),
+                periods=future_periods,
+                freq='Q'
+            )
+        elif freq == 'Y':
+            future_dates = pd.date_range(
+                start=last_date + pd.DateOffset(years=1),
+                periods=future_periods,
+                freq='Y'
+            )
+        else:
+            # デフォルトは日次
+            future_dates = pd.date_range(
+                start=last_date + pd.Timedelta(days=1),
+                periods=future_periods,
+                freq='D'
+            )
         
         # 将来の数値データ
         future_numeric = future_dates.astype('int64') // 10**9

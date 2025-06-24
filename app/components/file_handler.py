@@ -54,7 +54,8 @@ class FileHandler:
             io.BytesIO(bytes_data),
             encoding=encoding,
             delimiter=delimiter,
-            low_memory=False
+            low_memory=False,
+            na_values=['None', 'null', 'NULL', '', 'nan', 'NaN']  # より多くのNone値を認識
         )
         
         # データ型を自動判定
@@ -161,13 +162,19 @@ class FileHandler:
     def _is_datetime_column(self, series: pd.Series) -> bool:
         """列が日付時刻型かどうか判定"""
         if series.dtype == 'object':
-            # サンプルデータで日付フォーマットをチェック
-            sample_size = min(100, len(series.dropna()))
-            if sample_size == 0:
+            # Noneや空文字列を除外
+            valid_data = series.dropna()
+            valid_data = valid_data[valid_data != '']
+            valid_data = valid_data[valid_data != 'None']
+            
+            if len(valid_data) == 0:
                 return False
             
-            sample_data = series.dropna().iloc[:sample_size]
+            # サンプルデータで日付フォーマットをチェック
+            sample_size = min(100, len(valid_data))
+            sample_data = valid_data.iloc[:sample_size]
             
+            # まず指定フォーマットで試行
             for datetime_format in self.data_types_config.get('datetime_formats', []):
                 try:
                     pd.to_datetime(sample_data, format=datetime_format, errors='raise')
@@ -178,9 +185,9 @@ class FileHandler:
             # フォーマット指定なしでの変換も試行
             try:
                 converted = pd.to_datetime(sample_data, errors='coerce')
-                # 変換成功率が80%以上なら日付型と判定
+                # 変換成功率が70%以上なら日付型と判定（閾値を下げる）
                 success_rate = converted.notna().sum() / len(sample_data)
-                return success_rate >= 0.8
+                return success_rate >= 0.7
             except:
                 return False
         
@@ -223,15 +230,26 @@ class FileHandler:
     
     def _convert_to_datetime(self, series: pd.Series) -> pd.Series:
         """日付時刻型に変換"""
+        # Noneや空文字列を処理
+        series_clean = series.copy()
+        series_clean = series_clean.replace(['None', '', 'null', 'NULL'], pd.NaT)
+        
         # まず指定フォーマットで試行
         for datetime_format in self.data_types_config.get('datetime_formats', []):
             try:
-                return pd.to_datetime(series, format=datetime_format, errors='coerce')
+                converted = pd.to_datetime(series_clean, format=datetime_format, errors='coerce')
+                # 変換成功率をチェック
+                success_rate = converted.notna().sum() / len(series_clean.dropna())
+                if success_rate >= 0.7:
+                    return converted
             except:
                 continue
         
         # フォーマット指定なしで変換
-        return pd.to_datetime(series, errors='coerce')
+        try:
+            return pd.to_datetime(series_clean, errors='coerce')
+        except:
+            return series_clean
     
     def get_file_info(self, df: pd.DataFrame, file_name: str) -> Dict[str, Any]:
         """ファイル情報を取得"""
